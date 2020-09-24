@@ -1,0 +1,47 @@
+Fri Mar 04 15:37:13 EST 2016
+MaxEnt version 3.3.3k
+Reading file Back_swd.csv
+readGrid: max memory 2138767360, total allocated 85000192, free 73809544, used 11190648, increment 11190648
+Reading samples from Sp_swd.csv
+Read samples: max memory 2138767360, total allocated 85000192, free 69973848, used 15026344, increment 3835696
+Making features
+makeFeatures: max memory 2138767360, total allocated 85000192, free 68927704, used 16072488, increment 1046144
+Command line used:  environmentallayers=GadusMacrocephalus/models/1457123817/m_12705739/Back_swd.csv samplesfile=GadusMacrocephalus/models/1457123817/m_12705739/Sp_swd.csv projectionlayers=GadusMacrocephalus/models/1457123817/m_12705739/Predictions/Pred_swd.csv outputdirectory=GadusMacrocephalus/models/1457123817/GadusMacrocephalus_PA1_RUN7_MAXENT.Phillips_outputs outputformat=logistic redoifexists visible=FALSE linear=TRUE quadratic=TRUE product=TRUE threshold=FALSE hinge=FALSE lq2lqptthreshold=80 l2lqthreshold=10 hingethreshold=15 beta_threshold=-1 beta_categorical=-1 beta_lqp=0.95 beta_hinge=-1 betamultiplier=1 defaultprevalence=0.5 autorun nowarnings notooltips noaddsamplestobackground
+Command line to repeat: java density.MaxEnt nowarnings noprefixes outputdirectory=GadusMacrocephalus/models/1457123817/GadusMacrocephalus_PA1_RUN7_MAXENT.Phillips_outputs projectionlayers=GadusMacrocephalus/models/1457123817/m_12705739/Predictions/Pred_swd.csv samplesfile=GadusMacrocephalus/models/1457123817/m_12705739/Sp_swd.csv environmentallayers=GadusMacrocephalus/models/1457123817/m_12705739/Back_swd.csv nowarnings notooltips noaskoverwrite nothreshold nohinge noaddsamplestobackground autorun novisible beta_lqp=0.95
+Species: GadusMacrocephalus_PA1_RUN7
+Layers: etopo imax imin savg tavg
+Layertypes: Continuous Continuous Continuous Continuous Continuous
+outputdirectory: GadusMacrocephalus/models/1457123817/GadusMacrocephalus_PA1_RUN7_MAXENT.Phillips_outputs
+projectionlayers: GadusMacrocephalus/models/1457123817/m_12705739/Predictions/Pred_swd.csv
+samplesfile: GadusMacrocephalus/models/1457123817/m_12705739/Sp_swd.csv
+environmentallayers: GadusMacrocephalus/models/1457123817/m_12705739/Back_swd.csv
+warnings: false
+tooltips: false
+askoverwrite: false
+threshold: false
+hinge: false
+addsamplestobackground: false
+autorun: true
+visible: false
+beta_lqp: 0.95
+
+getSamples: max memory 2138767360, total allocated 85000192, free 68578984, used 16421208, increment 348720
+GadusMacrocephalus_PA1_RUN7: 
+Regularization values: linear/quadratic/product: 0.950, categorical: 0.250, threshold: 1.400, hinge: 0.500
+60 samples
+Density: max memory 2138767360, total allocated 85000192, free 68578984, used 16421208, increment 0
+linearPredictor: max memory 2138767360, total allocated 85000192, free 68578984, used 16421208, increment 0
+FeaturedSpace: max memory 2138767360, total allocated 85000192, free 68578984, used 16421208, increment 0
+Sequential: max memory 2138767360, total allocated 85000192, free 68578984, used 16421208, increment 0
+Initial loss: 6.20455776256869
+180: time = 0.036000 loss = 5.134555
+Resulting gain: 1.0700028347988049
+Time since start: 1.142
+Projecting...
+Writing file GadusMacrocephalus/models/1457123817/GadusMacrocephalus_PA1_RUN7_MAXENT.Phillips_outputs/GadusMacrocephalus_PA1_RUN7.csv
+Projecting...
+Reading file Pred_swd.csv
+readGrid: max memory 2138767360, total allocated 85000192, free 69416536, used 15583656, increment -837552
+Writing file GadusMacrocephalus/models/1457123817/GadusMacrocephalus_PA1_RUN7_MAXENT.Phillips_outputs/GadusMacrocephalus_PA1_RUN7_Pred_swd.csv
+Writing file GadusMacrocephalus/models/1457123817/GadusMacrocephalus_PA1_RUN7_MAXENT.Phillips_outputs/GadusMacrocephalus_PA1_RUN7_Pred_swd_clamping.csv
+Ending
