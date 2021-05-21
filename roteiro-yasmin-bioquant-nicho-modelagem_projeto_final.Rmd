@@ -1,0 +1,339 @@
+---
+title: "Tutorial Modelagem de Nicho"
+output:
+  html_document:
+    df_print: paged
+---
+Nome: Yasmin Coutinho Farias
+
+Este tutorial usará de exemplo a modelagem de nicho da peitica-de-chapéu-preto (Griseotyrannus Aurantioatrocristatus) na América Latina.
+
+#Dados Bióticos
+
+Para a presença da peitica-de-chapéu-preto na América Latina vamos utilizar as observações salvas por voluntários no banco de dados online eBird (<https://ebird.org/home>).
+
+#Dados Abióticos
+
+Para os dados abióticos vamos utilizar as 19 variáveis bioclimáticas com resolução espacial de 2.5 arc minutos disponibilizadas pelo WorldClim (<https://www.worldclim.org/data/index.html>) versão 2.1. Sendo 19 variáveis de dados históricos contendo o período de 1970-2000 utilizadas para projetar para o presente, e mais 19 variáveis utilizadas para a projeção futura do período médio de 2081-2100. Para realizar as projeções futuras vamos utilizar o cenário de mudanças mais radicais, o SSPs5 8.5, ao qual assume que as emissões de gases poluentes continuarão até 2100.
+
+Cuidado! Todas as variáveis devem ter as mesmas resoluções.
+
+#Processamento das Variaveis Ambientais
+
+Para utilizar as variáveis ambientais no nosso script final primeiro devemos corta-las para a área de estudo. Nesse caso, iremos recortar para a América Latina, você deve baixar ou gerar um arquivo shapefile que sirva de modelo para a área que você quer.
+
+```{r}
+###Este script é uma modificação dos scripts disponibilizados por Jeronymo Dalapicolla (<https://github.com/jdalapicolla/SDM_biomod2>) e por Hannah Owens (<https://gist.github.com/hannahlowens/898398b16bd29d2acee7972ca4cc746f>)###
+
+#Pacotes necessários
+library(rgdal)
+library(raster)
+
+#Delimitar uma projecao espacial para lat/long 
+longlat_WGS = CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0")
+
+#Carregar um raster para representar a resolução que você deseja
+exemplo_res = raster("~/GriseoAur/dados_ambientais/Presente/wc2.1_2.5m_bio_1.tif")
+crs(exemplo_res) = longlat_WGS
+
+#Carregar todas os arquivos rasters de uma pasta, selecionando pelo formato Recursive = TRUE incluirá todas as subpastas, as camadas devem estar na mesma resolução. Mude o "pattern" para o formato dos rasters (nesse caso são .tif)
+camadas = list.files(path="~/GriseoAur/dados_ambientais/Presente/", pattern =".tif", full.names=TRUE)
+camadas = stack(camadas)
+#definir a projecao
+crs(camadas) = longlat_WGS
+#Verificar
+camadas
+
+#Carregar a mascara para representar a area de estudo:
+mascara = shapefile("~/GriseoAur/area_estudo/South_America.shp")
+#Definir uma projeção. Deve ser a mesma para todos
+crs(mascara) = longlat_WGS
+plot(mascara)
+
+#reduzir para a area de estudo a camada usada como exemplo para a resolucao. Isso diminuira o tempo das analises
+exemplo_res_red = crop(exemplo_res, extent(mascara), snap="out") #cria uma area retangular
+plot(exemplo_res_red)
+
+#Mudar a resolucao das variaveis ambientais. Essa etapa pode levar muito tempo dependendo da area amostrada.
+camadas_res = resample(camadas, exemplo_res_red, method="bilinear", bylayer=TRUE, progress='text', snap="out")
+camadas_res
+plot(camadas_res[[1]])
+
+#Cortar as camadas reamostradas com a area de estudo
+camadas_res_mas = mask(camadas_res, mascara, bylayer=TRUE) # corta exatamente da forma da mascara
+plot(camadas_res_mas[[1]])
+plot(camadas_res)
+
+#Salvar as variaveis em formato .asc
+writeRaster(camadas_res, paste0("~/GriseoAur/variavel_presente/", filename = names(camadas)), format = "ascii", bylayer=TRUE, NAFlag = "-9999", overwrite = T)
+
+#Para salvar as variaveis ambientais pro futuro troque a linha 67 por "writeRaster(camadas_res, paste0("GriseoAur/variaveis/Futuro/ssp585/2081_2100/", paste0("bio",".asc")), driver='ascii', bylayer=TRUE, overwrite = T)"
+
+```
+
+Lembrando que esse processo deve ser feito para os dois grupos de variáveis. Quando você baixar a variável para o futuro ela virá em um só arquivo .tif, mas ela será salva em 19 variáveis diferentes. Importante os arquivos serem salvos em .asc, pois é o formato que o Maxent aceita.
+
+#Processamento dos Pontos de Ocorrência
+
+Agora iremos filtrar os pontos de ocorrência removendo os pontos duplicados, pontos fora da região que queremos e o viés amostral.
+
+```{r}
+###Este script é uma adaptação do script disponibilizado pelo Jeronymo Dalapicolla (<https://github.com/jdalapicolla/SDM_biomod2/blob/master/Passo05%20-%20Filtragem%20Pontos%20de%20Ocorrencia.R>)###
+
+#Pacotes necessarios
+library(rgdal)
+library(raster)
+library(dismo)
+
+#Delimitar uma projecao espacial para lat/long
+longlat_WGS = CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0")
+
+# Carregar os pontos de ocorrencia
+pontos_brutos = read.csv("~/GriseoAur/ocorrencias/GriseoAur.csv")
+head(pontos_brutos)
+str(pontos_brutos)
+
+# Carregar a camada ambiental em asc ja editada para servir como modelo
+variavel = raster("~/GriseoAur/variaveis/Presente/wc2.1_2.5m_bio_1.asc")
+crs(variavel) = longlat_WGS
+variavel
+
+#Remover pontos duplicados
+#numero de pontos brutos
+length(pontos_brutos[, 1]) #15529
+
+#remover duplicados
+pontos_unicos = pontos_brutos[!duplicated(pontos_brutos[c("LONGITUDE","LATITUDE")]), ] 
+
+#numero de pontos unicos:
+length(pontos_unicos[, 1]) #5185
+
+
+#Remover pontos fora da area de estudo
+
+#selecionar apenas as colunas de long e lat
+names(pontos_unicos)
+ocorrencia = pontos_unicos[,27:26] #lon/lat columns
+head(ocorrencia)
+str(ocorrencia)
+
+#Adicionar uma projecao
+coordinates(ocorrencia) = ~LONGITUDE+LATITUDE #nome das colunas.
+crs(ocorrencia) =  longlat_WGS
+
+#Extrair os valores da camada
+valores = extract(variavel, ocorrencia)
+head(valores)
+
+#Achar as posições onde não há valor, é um ponto fora da camada. NoData nos arquivos '.asc' é normalmente '-9999', mas você pode alterar o valor
+i = which(valores != "-9999")
+i #lines in the point_raw
+
+#atualizar os pontos únicos e criar um SpatialPoints para os pontos de ocorrencia
+pontos_unicos_area = pontos_unicos
+
+#numero de pontos restantes
+length(pontos_unicos_area[, 1]) #5185
+
+#Remover vies amostral que pode levar a autocorrelacao espacial
+#transformar os pontos em SpatialPoints
+names(pontos_unicos_area)
+ocorrencia = pontos_unicos_area[,27:26] # lon/lat columns
+coordinates(ocorrencia) = ~LONGITUDE+LATITUDE #nome das colunas.
+crs(ocorrencia) = longlat_WGS
+
+#criar um buffer de 10Km ao redor dos pontos
+buffer = circles(ocorrencia, d = 10000, lonlat=TRUE) #d é o raio do circulo em metros
+plot(buffer)
+class(buffer)
+
+#converter os círculos em polígonos
+buffer = polygons(buffer)
+#rasterizar os circulos
+buffer= rasterize(buffer, variavel)
+
+#selecionar 1 ponto por cada circulo
+sel = gridSample(ocorrencia, buffer, n=1)
+
+#verificar o numero de pontos restantes:
+length(sel[,1]) #3269
+
+#salvar os pontos de ocorrencia corrigidos
+sel = as.data.frame(sel)
+write.csv(sel, "~/GriseoAur/ocorrencias/griseoaur_corrigido.csv", row.names = FALSE)
+
+```
+
+#Modelagem
+
+Por último, iremos realizar a modelagem e projeção utilizando o pacote Biomod2.
+
+```{r}
+
+###Este script é uma modificação do script disponibilizado pela Hannah Owens (<https://gist.github.com/hannahlowens/974066848f8f85554ff7>)###
+
+#Pacotes necessarios
+library(biomod2);
+library(raster);
+library(RColorBrewer);
+library(dismo);
+
+#Carregar os pontos de ocorrencia
+pontos <- read.csv("~/GriseoAur/ocorrencias/griseoaur_corrigido.csv", header = T);
+pontos <- cbind(pontos, rep.int(1, length(nrow(pontos)))); #Adiciona outra coluna indicando que são pontos de presença
+colnames(pontos) <- c("X", "Y", "Response"); #muda o nome das colunas
+
+```
+
+```{r}
+#Carregar as variaveis ambientais presente
+envtList <- list.files(path = "~/GriseoAur/variavel_presente/", pattern = ".asc", full.names = FALSE);
+envt.st <- stack(envtList);
+crs(envt.st) <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+
+#Carregar as variaveis ambientais para projeção
+projectionList <- list.files(path = "~/GriseoAur/variavel_futuro/", pattern = ".asc", full.names = FALSE);
+proj.st <- stack(projectionList);
+crs(proj.st) <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+
+#Padronizando os nomes das variaveis
+names(proj.st) = names(envt.st)
+
+#Configurando os dados para o Biomod2
+bmData <- BIOMOD_FormatingData(resp.var = pontos[,3],
+                               resp.xy = pontos[,1:2], 
+                               resp.name = "GriseoAurant",
+                               expl.var = envt.st,
+                               PA.nb.rep=1
+);
+
+
+#Baixando o Maxent direto na pasta java do pacote dismo
+utils::download.file(url = "https://raw.githubusercontent.com/mrmaxent/Maxent/master/ArchivedReleases/3.3.3k/maxent.jar", 
+                     destfile = paste0(system.file("java", package = "dismo"), 
+                                       "/maxent.jar"), mode = "wb")
+
+##OBS: Para rodar o Maxent deve ter o interpretador Java carregado em seu computador
+
+#Configurando o Maxent
+myBiomodOption <- Print_Default_ModelingOptions();
+myBiomodOption@MAXENT.Phillips$path_to_maxent.jar = paste(system.file(package="dismo"), "/java", sep='');
+myBiomodOption@MAXENT.Phillips$memory_allocated = 2048; #Allocates 2048 MB/2 GB of memory to modeling
+myBiomodOption@MAXENT.Phillips$maximumiterations = 10000;
+myBiomodOption@MAXENT.Phillips$threshold = F;
+myBiomodOption@MAXENT.Phillips$hinge = F;
+myBiomodOption@MAXENT.Phillips$visible = F;
+myBiomodOption@MAXENT.Phillips$beta_lqp = .95;
+
+#Rodando o Maxent
+#Rodar apenas o modelo do Maxent
+myMaxentModel <- BIOMOD_Modeling(data=bmData,
+                                    models=c('MAXENT.Phillips'),
+                                    models.options=myBiomodOption,
+                                    NbRunEval=10,
+                                    do.full.models = F,
+                                    DataSplit=50,
+                                    models.eval.meth = c('KAPPA','TSS','ROC'),
+                                    SaveObj = T,
+);
+
+#Rodar a junção de todos os modelos 
+myMaxentEnsemble <- BIOMOD_EnsembleModeling( modeling.output = myMaxentModel,
+                                   chosen.models = 'all',
+                                   em.by = 'all',
+                                   eval.metric = c('TSS'),
+                                   eval.metric.quality.threshold = NULL,
+                                   models.eval.meth = c('TSS','ROC','KAPPA'),
+                                   prob.median = TRUE )
+
+#Projetando o modelo para o presente
+myBiomodProjPres <- BIOMOD_Projection(modeling.output = myMaxentModel,
+                                    new.env = envt.st,
+                                    proj.name = 'Present',
+                                    selected.models = 'all',
+                                    compress = 'gzip',
+                                    clamping.mask = T,
+                                    output.format = '.grd',
+                                    do.stack=T
+);
+
+mod_projPres <- get_predictions(myBiomodProjPres);
+presentResult <- calc(mod_projPres,fun = median); #Choose whatever descriptive statistic you'd like
+plot(presentResult, main = "Griseotyrannus Aurantioatrocristatus - Presente");
+writeRaster(presentResult, filename = "gaPresente", format = "GTiff", overwrite = T);
+```
+
+```{r}
+#Projetando o modelo conjunto para o presente
+myBiomodProjPresEnsemble <- BIOMOD_EnsembleForecasting(myMaxentEnsemble,
+                            projection.output = myBiomodProjPres,
+                            selected.models = 'all',
+                            compress = 'gzip'
+);
+mod_projPresEnsemble <- get_predictions(myBiomodProjPresEnsemble);
+presentEnsembleResult <- mod_projPresEnsemble[[2]] #This is the median model ensemble
+plot(presentEnsembleResult, main = "Griseotyrannus Aurantioatrocristatus - Presente");
+writeRaster(presentEnsembleResult, filename = "gaPresenteEnsemble", format = "GTiff", overwrite = T);
+```
+
+```{r}
+#Projetando o modelo Maxent para o futuro
+myBiomodProj2100 <- BIOMOD_Projection(modeling.output = myMaxentModel,
+                                    new.env = proj.st,
+                                    proj.name = 'In2100',
+                                    selected.models = 'all',
+                                    compress = 'gzip',
+                                    clamping.mask = T,
+                                    output.format = '.grd',
+                                    do.stack=T
+);
+
+mod_proj2100<- get_predictions(myBiomodProj2100);
+result2100 <- calc(mod_proj2100,fun = median); #Choose whatever descriptive statistic you'd like
+plot(result2100, main = "Griseotyrannus Aurantioatrocristatus - Em 2100");
+writeRaster(result2100, filename = "ga2100", format = "GTiff", overwrite = T);
+```
+
+```{r}
+#Projetando o modelo conjunto para 2100
+myBiomodProj2100Ensemble <- BIOMOD_EnsembleForecasting(myMaxentEnsemble,
+                                                       projection.output = myBiomodProj2100,
+                                                       selected.models = 'all',
+                                                       compress = 'gzip'
+);
+mod_proj2100Ensemble <- get_predictions(myBiomodProj2100Ensemble);
+ensembleResult2100 <- mod_proj2100Ensemble[[2]] #This is the median model ensemble
+plot(ensembleResult2100, main = "Griseotyrannus Aurantioatrocristatus - Em 2100");
+writeRaster(ensembleResult2100, filename = "ga2100Ensemble", format = "GTiff", overwrite = T);
+```
+
+Vamos avaliar as variáveis
+
+```{r}
+#Contribuição das variaveis para o modelo do presente
+pontosocc=cbind.data.frame(pontos$X,pontos$Y)
+fold <- kfold(pontosocc, k=5) # forma 5 grupos aleatórios de distribuições
+pontostest <- pontosocc[fold == 1, ] #segura um quinto como dados de teste
+pontostrain <- pontosocc[fold != 1, ] #o quatro quintos são dados para treinar
+
+presente.me <- maxent(envt.st, pontostrain) 
+
+plot(presente.me)
+```
+
+```{r}
+#Response curves
+response(presente.me)
+```
+
+```{r}
+#Contribuição das variaveis para o modelo futuro
+futuro.me <- maxent(proj.st, pontostrain) #usa só os dados para treinamento
+
+plot(futuro.me)
+```
+
+```{r}
+#Response curves
+response(futuro.me)
+```
